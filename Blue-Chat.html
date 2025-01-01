@@ -4,190 +4,182 @@
 <script type="text/javascript" src='file:///android_asset/app.js'></script>
 </head>
 <script type="text/javascript">
-//Credits to the creator of "B-chat" (Based on B-chat) but better
-//you can try to join multiple people
-//Made by: HJCD studios
-/*
-.__________________WARNING___________________________.
-|YOU CAN CHANGE THIS SPK/APK ANY WAY YOU WANT|
-|      BUT YOU NEED THIS STICKER,DO NOT REMOVE        |
-|BECAUSE THIS IS COPYRIGHT OF THE HJCD STUDIOS   |
-\                                  COMPANY                                              /
-  \____________________________________________________/
+	
+	var still_here = true;
+	
+	function OnBack() {
+		if (confirm("Exit App?")) {
+			bt.Disconnect();
+			app.Exit();
+		}
+	}
+	
+	function OnPause() {
+		still_here = false;
+	}
 
-CEO: JONAS KRISTER VILLAMAYOR
-*/
-var still_here = true;
+	function OnResume() {
+		still_here = true;
+	}
+	
+	function OnStart() {
+		if (!app.FolderExists( "/sdcard/.BlueChat" )) { app.MakeFolder( "/sdcard/.BlueChat" ); app.WriteFile( "/sdcard/.BlueChat/data.txt","","ASC||" );}
+			app.PreventScreenLock();
+			app.SetOrientation( "portrait" );
+			app.SetScreenMode( "game" );
+			app.EnableBackKey( false );
+			if (!app.IsBluetoothEnabled()) {
+				app.SetBluetoothEnabled( true );
+			}
 
+			bt = app.CreateBluetoothSerial();
+			bt.SetOnConnect( connection );
+			bt.SetOnDisconnect( disconnected );
+			bt.SetOnReceive( received );
+			bt.SetSplitMode( "End","\n" );
+			bt.Listen( true );
+			
+			reload_devices();
 
-function OnBack() {
-if (confirm("Exit App?")) {
-bt.Disconnect();
-app.Exit();
-}
-}
-function OnPause() {
-still_here = false;
-}
-function OnResume() {
-still_here = true;
-}
-function OnStart() {
-if (!app.FolderExists( "/sdcard/.BlueChat" )) { app.MakeFolder( "/sdcard/.BlueChat" ); app.WriteFile( "/sdcard/.BlueChat/data.txt","","ASC||" );}
+			document.getElementById("txt_color").value=app.LoadText( "txt_col","white","txt" );
+			document.getElementById("txt_color").style.borderColor=app.LoadText( "txt_col","white","txt" );
+			document.getElementById("back_color").value=app.LoadText( "back_col","black","back" );
+			document.getElementById("back_color").style.borderColor=app.LoadText( "back_col","black","back" );
+			document.getElementById("out_color").value=app.LoadText( "out_col","black","out" );
+			document.getElementById("out_color").style.borderColor=app.LoadText( "out_col","black","out" );
+			document.getElementById("em_btn").src=app.LoadText( "em","Img/like.png","em" );
+			
+			setTimeout("hide_logo();",1000);
+	}
 
-app.PreventScreenLock();
-app.SetOrientation( "portrait" );
-app.SetScreenMode( "game" );
-app.EnableBackKey( false );
+	function connection(ok) {
+		if (ok) {
+			document.getElementById("msgs").innerHTML=app.ReadFile( "/sdcard/.BlueChat/data.txt" );
+			app.HideProgress();
+			app.ShowPopup( "Connected!","Bottom" );
+			document.getElementById("messenger").style.display="block";
+			document.getElementById("connection").style.display="none";
+		} else {
+			app.HideProgress();
+			app.ShowPopup( "Failed to connect","Bottom" );
+			if (!app.IsBluetoothEnabled()) {
+				app.SetBluetoothEnabled( true );
+			}
+		}
+	}
+	
+	function disconnected() {
+		app.ShowPopup( "Disconnected","Bottom" );
+		var filele = app.ReadFile( "/sdcard/.BlueChat/data.txt" );
+		if (filele.indexOf(document.getElementById("msgs").innerHTML) <= -1) {
+			app.WriteFile( "/sdcard/.BlueChat/data.txt",document.getElementById("msgs").innerHTML,"Append" );
+		}
+		document.getElementById("msgs").innerHTML="";
+		document.getElementById("messenger").style.display="none";
+		document.getElementById("connection").style.display="block";
+	}
 
-if (!app.IsBluetoothEnabled()) {
-app.SetBluetoothEnabled( true );
-}
+	function received(data) {
+		if (!still_here) {
+			var msg1 = data.indexOf("<!--msg_start-->") + 16;
+			var msg2 = data.indexOf("<!--msg_end-->");
+			var msg = data.slice(msg1,msg2);
+			var name1 = data.indexOf("<!--name_start-->") + 17;
+			var name2 = data.indexOf("<!--name_end-->");
+			var name = data.slice(name1,name2);
+			var noti = app.CreateNotification( "AutoCancel" );
+			noti.SetMessage( "A New Message","From: " + name,msg );
+			noti.Notify();
+		}
+		document.getElementById("msgs").innerHTML+=data;
+	}
+	
+	function reload_devices() {
+		document.getElementById("devs").innerHTML="";
+		var devices = app.GetPairedBtDevices();
+		for(var d = 0; d < devices.length; d++) {
+			var click = "connect('" + devices[d].address + "');";
+			document.getElementById("devs").innerHTML+="<hr><table><tr><td><b onClick=" + click + ">Name: " + devices[d].name + "</b></td></tr><tr><td><b>Address: " + devices[d].address + "</b></td></tr></table>";
+		}
+	}
+	
+	function connect(address) {
+		app.ShowProgress( "Connecting..." );
+		bt.Connect( address );
+	}
 
-bt = app.CreateBluetoothSerial();
-bt.SetOnConnect( connection );
-bt.SetOnDisconnect( disconnected );
-bt.SetOnReceive( received );
-bt.SetSplitMode( "End","\n" );
-bt.Listen( true );
+	function sends() {
+		var stuff = {
+		"msg":document.getElementById("msg").value,
+		"bgc":document.getElementById("back_color").value,
+		"tc":document.getElementById("txt_color").value,
+		"oc":document.getElementById("out_color").value,
+		"name":app.GetBluetoothName()
+		};
+		if (stuff.msg.length >= 1) {
+			var new_msg = stuff.msg.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;");
+			bt.Write( "<pre class='not_mine' style='background-color: " + stuff.bgc + "; border: 2px solid " + stuff.oc + ";'><sup style='color: white'><!--name_start-->" + stuff.name + "<!--name_end--></sup><br><b style='color: " + stuff.tc + "'><!--msg_start-->" +  new_msg + "<!--msg_end--></b></pre>\n" );
+			document.getElementById("msgs").innerHTML+="<pre class='mine' style='color: " + stuff.tc + "; background-color: " + stuff.bgc + "; border: 2px solid " + stuff.oc + ";'>" + new_msg + "</pre>";
+			document.getElementById("msg").value="";
+			app.Vibrate( "0,50,0,50" );
+			document.getElementById('send_btn').style.display='none'; document.getElementById('em_btn').style.display='block';
+		}
+	}
+	
+	function enters_address() {
+		var a = prompt("Enter Address");
+		bt.Connect( a );
+	}
+	
+	function deletes_history() {
+		if (app.FileExists( "/sdcard/.BlueChat/data.txt" )) {
+			if (confirm("Delete All History?")) {
+				app.WriteFile( "/sdcard/.BlueChat/data.txt","","ASC||" );
+				document.getElementById("msgs").innerHTML="";
+				app.ShowPopup( "Deleted History","Bottom" );
+			}
+		} else {
+			app.ShowPopup( "No History","Bottom" );
+		}
+	}
+	
+	function load_em() {
+		document.getElementById("em_btn").src=app.LoadText( "em",app.ReadFile( "Html/like.txt" ),"em" );
+	}
 
-reload_devices();
+	function send_emo(src) {
+		var name = app.GetBluetoothName();
+		bt.Write( "<pre class='not_mine'><sup style='color: white'><!--name_start-->" + name + "<!--name_end--></sup><br><!--msg_start-->Sent an emoji<!--msg_end--><img align='left' src='file:///android_asset/user/" + app.LoadText( "em","Img/like.png","em" ) + "' class='emes'></pre><br><br>\n" );
+		document.getElementById("msgs").innerHTML+="<br><br><img align='right' src=" + src + " class='emes'><br><br>";
+		document.getElementById('send_btn').style.display='none'; document.getElementById('em_btn').style.display='block';
+		app.Vibrate( "0,50,0,50" );
+	}
 
-document.getElementById("txt_color").value=app.LoadText( "txt_col","white","txt" );
-document.getElementById("txt_color").style.borderColor=app.LoadText( "txt_col","white","txt" );
-document.getElementById("back_color").value=app.LoadText( "back_col","black","back" );
-document.getElementById("back_color").style.borderColor=app.LoadText( "back_col","black","back" );
-document.getElementById("out_color").value=app.LoadText( "out_col","black","out" );
-document.getElementById("out_color").style.borderColor=app.LoadText( "out_col","black","out" );
-document.getElementById("em_btn").src=app.LoadText( "em","Img/like.png","em" );
+	function hide_logo() {
+		document.getElementById("logo").style.display="none";
+		document.body.style.backgroundImage="url('file:///android_asset/Img/BlueBack.jpg')";
+		document.getElementById("connection").style.display="block";
+	}
 
-setTimeout("hide_logo();",1000);
-}
-function connection(ok) {
-if (ok) {
-document.getElementById("msgs").innerHTML=app.ReadFile( "/sdcard/.BlueChat/data.txt" );
-app.HideProgress();
-app.ShowPopup( "Connected!","Bottom" );
-document.getElementById("messenger").style.display="block";
-document.getElementById("connection").style.display="none";
-} else {
-app.HideProgress();
-app.ShowPopup( "Failed to connect","Bottom" );
-if (!app.IsBluetoothEnabled()) {
-app.SetBluetoothEnabled( true );
-}
-}
-}
-function disconnected() {
-app.ShowPopup( "Disconnected","Bottom" );
-var filele = app.ReadFile( "/sdcard/.BlueChat/data.txt" );
-if (filele.indexOf(document.getElementById("msgs").innerHTML) <= -1) {
-app.WriteFile( "/sdcard/.BlueChat/data.txt",document.getElementById("msgs").innerHTML,"Append" );
-}
-document.getElementById("msgs").innerHTML="";
-document.getElementById("messenger").style.display="none";
-document.getElementById("connection").style.display="block";
-/*
-document.getElementById("txt_color").value="black";
-document.getElementById("txt_color").style.borderColor="black";
-document.getElementById("back_color").value="black";
-document.getElementById("back_color").style.borderColor="black";
-document.getElementById("out_color").value="black";
-document.getElementById("out_color").style.borderColor="black";
-this is for future use
-*/
-}
-function received(data) {
-if (!still_here) {
-var msg1 = data.indexOf("<!--msg_start-->") + 16;
-var msg2 = data.indexOf("<!--msg_end-->");
-var msg = data.slice(msg1,msg2);
-var name1 = data.indexOf("<!--name_start-->") + 17;
-var name2 = data.indexOf("<!--name_end-->");
-var name = data.slice(name1,name2);
-var noti = app.CreateNotification( "AutoCancel" );
-noti.SetMessage( "A New Message","From: " + name,msg );
-noti.Notify();
-}
-document.getElementById("msgs").innerHTML+=data;
-}
-function reload_devices() {
-document.getElementById("devs").innerHTML="";
-var devices = app.GetPairedBtDevices();
-for(var d = 0; d < devices.length; d++) {
-var click = "connect('" + devices[d].address + "');";
-document.getElementById("devs").innerHTML+="<hr><table><tr><td><b onClick=" + click + ">Name: " + devices[d].name + "</b></td></tr><tr><td><b>Address: " + devices[d].address + "</b></td></tr></table>";
-}
-}
-function connect(address) {
-app.ShowProgress( "Connecting..." );
-bt.Connect( address );
-}
-function sends() {
-var stuff = {
-"msg":document.getElementById("msg").value,
-"bgc":document.getElementById("back_color").value,
-"tc":document.getElementById("txt_color").value,
-"oc":document.getElementById("out_color").value,
-"name":app.GetBluetoothName()
-};
-if (stuff.msg.length >= 1) {
-var new_msg = stuff.msg.replace("&","&amp;").replace("<","&lt;").replace(">","&gt;");
-bt.Write( "<pre class='not_mine' style='background-color: " + stuff.bgc + "; border: 2px solid " + stuff.oc + ";'><sup style='color: white'><!--name_start-->" + stuff.name + "<!--name_end--></sup><br><b style='color: " + stuff.tc + "'><!--msg_start-->" +  new_msg + "<!--msg_end--></b></pre>\n" );
-document.getElementById("msgs").innerHTML+="<pre class='mine' style='color: " + stuff.tc + "; background-color: " + stuff.bgc + "; border: 2px solid " + stuff.oc + ";'>" + new_msg + "</pre>";
-document.getElementById("msg").value="";
-app.Vibrate( "0,50,0,50" );
-document.getElementById('send_btn').style.display='none'; document.getElementById('em_btn').style.display='block';
-}
-}
-function enters_address() {
-var a = prompt("Enter Address");
-bt.Connect( a );
-}
-function deletes_history() {
-if (app.FileExists( "/sdcard/.BlueChat/data.txt" )) {
-if (confirm("Delete All History?")) {
-app.WriteFile( "/sdcard/.BlueChat/data.txt","","ASC||" );
-document.getElementById("msgs").innerHTML="";
-app.ShowPopup( "Deleted History","Bottom" );
-}
-} else {
-app.ShowPopup( "No History","Bottom" );
-}
-}
-function load_em() {
-document.getElementById("em_btn").src=app.LoadText( "em",app.ReadFile( "Html/like.txt" ),"em" );
-}
-function send_emo(src) {
-var name = app.GetBluetoothName();
-bt.Write( "<pre class='not_mine'><sup style='color: white'><!--name_start-->" + name + "<!--name_end--></sup><br><!--msg_start-->Sent an emoji<!--msg_end--><img align='left' src='file:///android_asset/user/" + app.LoadText( "em","Img/like.png","em" ) + "' class='emes'></pre><br><br>\n" );
-document.getElementById("msgs").innerHTML+="<br><br><img align='right' src=" + src + " class='emes'><br><br>";
-document.getElementById('send_btn').style.display='none'; document.getElementById('em_btn').style.display='block';
-app.Vibrate( "0,50,0,50" );
-}
-function hide_logo() {
-document.getElementById("logo").style.display="none";
-document.body.style.backgroundImage="url('file:///android_asset/Img/BlueBack.jpg')";
-document.getElementById("connection").style.display="block";
-}
-function help() {
-var msg = "Your Device Name: " + app.GetBluetoothName() + "\nYour Device Address: " + app.GetBluetoothAddress() + "\n\n" +
-"Hello welcome to Blue-Chat where we send your messages via bluetooth this is a family friendly app\n\n" +
-"Does this app record.my chats?\n" +
-"Like any-other Chat apps we record your chats but we dont send them to any-one you can even access it with this link: file:///sdcard/.BlueChat/\n\n" +
-"How does this app send messages?\n" +
-"By bluetooth\n\n" +
-"Can i create a group chat with this app?\n" +
-"No\n\n" +
-"How do i connect to my friend?\n" +
-"Find your friends device on the paired devices list if you dont see your friends device just enter their bluetooth address\n\n" +
-"Found a bug? Report it here: jonasvillamayor13@gmail.com";
-app.Alert( msg,"Help" );
-}
+	function help() {
+		var msg = "Your Device Name: " + app.GetBluetoothName() + "\nYour Device Address: " + app.GetBluetoothAddress() + "\n\n" +
+		"Hello welcome to Blue-Chat where we send your messages via bluetooth this is a family friendly app\n\n" +
+		"Does this app record.my chats?\n" +
+		"Like any-other Chat apps we record your chats but we dont send them to any-one you can even access it with this link: file:///sdcard/.BlueChat/\n\n" +
+		"How does this app send messages?\n" +
+		"By bluetooth\n\n" +
+		"Can i create a group chat with this app?\n" +
+		"No\n\n" +
+		"How do i connect to my friend?\n" +
+		"Find your friends device on the paired devices list if you dont see your friends device just enter their bluetooth address\n\n" +
+		"Found a bug? Report it here: jonasvillamayor13@gmail.com";
+		app.Alert( msg,"Help" );
+	}
+
 </script>
 <style type="text/css">
 body {
-background: blue;
+background: transparent;
 }
 .mine {
 text-align: right;
@@ -220,9 +212,12 @@ background-color: rgb(0,150,255);
 }
 #msg {
 padding: 5px;
-font-size: 20px;
+font-size: 16px;
 border-color: grey;
 border-radius: 20px;
+background: linear-gradient(to bottom,  rgba(215,209,227,1) 0%,rgba(183,171,203,1) 49%,rgba(189,179,207,1) 87%,rgba(173,157,193,1) 100%);
+-webkit-box-shadow: 0 0 12px 8px #B0B0B0;
+box-shadow: 0 0 12px 8px #B0B0B0;
 }
 b {
 color: white;
@@ -234,10 +229,11 @@ height: 50px;
 #logo {
 margin-Top: 50%;
 padding: 10px;
+visibility:hidden;
 }
 </style>
-<body onload="app.Start()">
-<img id="logo" src="Img/Blue-Chat.png" width="100%">
+<body onLoad="app.Start()">
+<img id="logo" src="Img/Blue-Chat.png" width="0%">
 <center>
 <div id="connection" style="display: none;">
 <input type="button" class="reload_btn" value="Reload" onClick="reload_devices();">
@@ -258,7 +254,7 @@ padding: 10px;
 <table>
 <tr>
 <td>
-<textarea onkeyup="if (this.value.length >= 1) { document.getElementById('send_btn').style.display='block'; document.getElementById('em_btn').style.display='none'; } else { document.getElementById('send_btn').style.display='none'; document.getElementById('em_btn').style.display='block'; }" placeholder="Type Something..." id="msg">
+<textarea onKeyUp="if (this.value.length >= 1) { document.getElementById('send_btn').style.display='block'; document.getElementById('em_btn').style.display='none'; } else { document.getElementById('send_btn').style.display='none'; document.getElementById('em_btn').style.display='block'; }" placeholder="Type Something..." id="msg">
 </textarea>
 </td>
 <td>
